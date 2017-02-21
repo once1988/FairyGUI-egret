@@ -21,6 +21,9 @@ module fairygui {
         private _autoPlay: boolean;
 
         public static OPTION_IGNORE_DISPLAY_CONTROLLER: number = 1;
+        public static OPTION_AUTO_STOP_DISABLED: number = 2;
+		public static OPTION_AUTO_STOP_AT_END: number = 4;
+        
         private static FRAME_RATE: number = 24;
 
         public constructor(owner: GComponent) {
@@ -77,13 +80,12 @@ module fairygui {
                 this._onCompleteParam = onCompleteParam;
                 this._onCompleteObj = onCompleteObj;
 
-                this._owner.internalVisible++;
                 if((this._options & Transition.OPTION_IGNORE_DISPLAY_CONTROLLER) != 0) {
                     var cnt: number = this._items.length;
                     for(var i: number = 0;i < cnt;i++) {
                         var item: TransitionItem = this._items[i];
                         if(item.target != null && item.target != this._owner)
-                            item.target.internalVisible++;
+                            item.displayLockToken = item.target.addDisplayLock();
                     }
                 }
             }
@@ -106,8 +108,6 @@ module fairygui {
                 this._onComplete = null;
                 this._onCompleteParam = null;
                 this._onCompleteObj = null;
-
-                this._owner.internalVisible--;
 
                 var cnt: number = this._items.length;
                 var i:number;
@@ -141,8 +141,10 @@ module fairygui {
         }
         
         private stopItem(item:TransitionItem, setToComplete:boolean):void {
-            if ((this._options & Transition.OPTION_IGNORE_DISPLAY_CONTROLLER) != 0 && item.target != this._owner)
-				item.target.internalVisible--;
+            if (item.displayLockToken!=0) {
+				item.target.releaseDisplayLock(item.displayLockToken);
+                item.displayLockToken = 0;
+            }
 			
 			if (item.type == TransitionActionType.ColorFilter && item.filterCreated)
 				item.target.filters = null;
@@ -357,6 +359,11 @@ module fairygui {
                 }
             }
         }
+
+		public OnOwnerRemovedFromStage():void {
+			if ((this._options & Transition.OPTION_AUTO_STOP_DISABLED) == 0)
+				this.stop((this._options & Transition.OPTION_AUTO_STOP_AT_END) != 0 ? true : false, false);
+		}
 
         private internalPlay(delay: number=0) {
             this._ownerBaseX = this._owner.x;
@@ -602,23 +609,24 @@ module fairygui {
                     egret.callLater(this.internalPlay,this,0);
                     else {
                         this._playing = false;
-                        this._owner.internalVisible--;
-                        
+
                         var cnt: number = this._items.length;
 						for (var i:number = 0; i < cnt; i++)
 						{
 							var item:TransitionItem = this._items[i];
 							if (item.target != null)
 							{
-								if((this._options & Transition.OPTION_IGNORE_DISPLAY_CONTROLLER) != 0 && item.target!=this._owner)
-									item.target.internalVisible--;
-							}
-							
-							if (item.filterCreated)
-							{
-								item.filterCreated = false;
-								item.target.filters = null;
-							}
+                                if (item.displayLockToken!=0) {
+                                    item.target.releaseDisplayLock(item.displayLockToken);
+                                    item.displayLockToken = 0;
+                                }
+
+                                if (item.filterCreated)
+                                {
+                                    item.filterCreated = false;
+                                    item.target.filters = null;
+                                }
+                            }
 						}
 
                         if(this._onComplete != null) {
@@ -685,13 +693,13 @@ module fairygui {
 					item.target.setSkew(value.f1, value.f2);
 					break;
                 case TransitionActionType.Color:
-                    (<IColorGear><any>item.target).color = value.c;
+                    (<any>item.target).color = value.c;
                     break;
                 case TransitionActionType.Animation:
                     if(!value.b1)
-                        value.i = (<IAnimationGear><any>item.target).frame;
-                    (<IAnimationGear><any>item.target).frame = value.i;
-                    (<IAnimationGear><any>item.target).playing = value.b;
+                        value.i = (<any>item.target).frame;
+                    (<any>item.target).frame = value.i;
+                    (<any>item.target).playing = value.b;
                     break;
                 case TransitionActionType.Visible:
                     item.target.visible = value.b;
@@ -1023,6 +1031,7 @@ module fairygui {
         public completed: boolean = false;
         public target: fairygui.GObject;
         public filterCreated: boolean;
+        public displayLockToken: number = 0;
 
         public constructor() {
             this.easeType = egret.Ease.quadOut;

@@ -59,6 +59,15 @@ module fairygui {
                 (<GLabel>this._titleObject).titleColor = value;
             else if(this._titleObject instanceof GButton)
                 (<GButton>this._titleObject).titleColor = value;
+            this.updateGear(4);
+        }
+
+        public get color(): number {
+            return this.titleColor;
+        }
+        
+        public set color(value: number) {
+            this.titleColor = value;
         }
 
         public set editable(val: boolean) {

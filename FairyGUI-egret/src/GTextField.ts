@@ -1,7 +1,7 @@
 
 module fairygui {
 
-    export class GTextField extends GObject implements IColorGear {
+    export class GTextField extends GObject {
         protected _textField: egret.TextField;
         protected _bitmapContainer: egret.DisplayObjectContainer;
         protected _font: string;
@@ -129,7 +129,7 @@ module fairygui {
         public set color(value: number) {
             if (this._color != value) {
                 this._color = value;
-               this.updateGear(4);
+                this.updateGear(4);
                 this.updateTextFormat();
             }
         }
@@ -230,6 +230,7 @@ module fairygui {
 
         public set strokeColor(value: number) {
             this._textField.strokeColor = value;
+            this.updateGear(4);
         }
 
         public set ubbEnabled(value: boolean) {
