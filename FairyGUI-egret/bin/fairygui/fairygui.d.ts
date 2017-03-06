@@ -283,6 +283,8 @@ declare module fairygui {
     class GComponent extends GObject {
         private _sortingChildCount;
         private _opaque;
+        private _childrenRenderOrder;
+        private _apexIndex;
         protected _margin: Margin;
         protected _trackBounds: boolean;
         protected _boundsChanged: boolean;
@@ -323,6 +325,7 @@ declare module fairygui {
         removeController(c: Controller): void;
         controllers: Array<Controller>;
         childStateChanged(child: GObject): void;
+        private buildNativeDisplayList();
         applyController(c: Controller): void;
         applyAllControllers(): void;
         adjustRadioGroupDepth(obj: GObject, c: Controller): void;
@@ -333,6 +336,8 @@ declare module fairygui {
         scrollPane: ScrollPane;
         opaque: boolean;
         margin: Margin;
+        childrenRenderOrder: ChildrenRenderOrder;
+        apexIndex: number;
         mask: egret.DisplayObject | egret.Rectangle;
         protected updateOpaque(): void;
         protected updateScrollRect(): void;
@@ -437,6 +442,11 @@ declare module fairygui {
         Horizontal = 1,
         Vertical = 2,
         Both = 3,
+    }
+    enum ChildrenRenderOrder {
+        Ascent = 0,
+        Descent = 1,
+        Arch = 2,
     }
     enum RelationType {
         Left_Left = 0,
@@ -848,8 +858,8 @@ declare module fairygui {
         reversed: boolean;
         repeatedCount: number;
         private _curFrame;
-        private _lastTime;
         private _curFrameDelay;
+        private _lastUpdateSeq;
         constructor();
         update(mc: MovieClip): void;
         currentFrame: number;
@@ -892,6 +902,7 @@ declare module fairygui {
         text: string;
         selectedTitle: string;
         titleColor: number;
+        titleFontSize: number;
         sound: string;
         soundVolumeScale: number;
         selected: boolean;
@@ -1067,6 +1078,7 @@ declare module fairygui {
         text: string;
         titleColor: number;
         color: number;
+        titleFontSize: number;
         editable: boolean;
         protected constructFromXML(xml: any): void;
         setup_afterAdd(xml: any): void;
@@ -1372,6 +1384,9 @@ declare module fairygui {
         private _enumI;
         private _enumCount;
         private _lastTime;
+        static deltaTime: number;
+        static time: number;
+        static workCount: number;
         static inst: GTimers;
         private static FPS24;
         constructor();
