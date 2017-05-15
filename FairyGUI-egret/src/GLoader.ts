@@ -219,6 +219,9 @@ module fairygui {
             if(this._contentItem != null) {
                 this._contentItem.load();
 
+                if(this._autoSize)
+                    this.setSize(this._contentItem.width, this._contentItem.height);
+
                 if(this._contentItem.type == PackageItemType.Image) {
                     if(this._contentItem.texture == null) {
                         this.setErrorState();
@@ -246,7 +249,6 @@ module fairygui {
                     mc.swing = this._contentItem.swing;
                     mc.repeatDelay = this._contentItem.repeatDelay;
                     mc.frames = this._contentItem.frames;
-                    mc.boundsRect = new egret.Rectangle(0,0,this._contentSourceWidth,this._contentSourceHeight);
                     this.updateLayout();
                 }
                 else
@@ -312,8 +314,7 @@ module fairygui {
             }
 
             if (this._errorSign != null) {
-                this._errorSign.width = this.width;
-                this._errorSign.height = this.height;
+                this._errorSign.setSize(this.width, this.height);
                 this._container.addChild(this._errorSign.displayObject);
             }
         }

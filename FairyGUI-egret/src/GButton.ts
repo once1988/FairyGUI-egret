@@ -269,14 +269,14 @@ module fairygui {
                     var color: number = (r << 16) + (r << 8) + r;
                     for(var i: number = 0;i < cnt;i++) {
                         var obj: GObject = this.getChildAt(i);
-                        if(obj["color"]!=undefined)
+                        if(obj["color"]!=undefined && !(obj instanceof GTextField))
                             (<any>obj).color = color;
                     }
                 }
                 else {
                     for(var i:number = 0;i < cnt;i++) {
                         var obj:GObject = this.getChildAt(i);
-                        if(obj["color"]!=undefined)
+                        if(obj["color"]!=undefined && !(obj instanceof GTextField))
                             (<any>obj).color = 0xFFFFFF;
                     }
                 }
@@ -380,6 +380,14 @@ module fairygui {
                 str = xml.attributes.titleFontSize;
                 if (str)
                     this.titleFontSize = parseInt(str);
+
+                str = xml.attributes.sound;
+				if (str!=null)
+					this._sound = str;
+
+				str = xml.attributes.volume;
+				if(str)
+					this._soundVolumeScale = parseInt(str)/100;
 
                 str = xml.attributes.controller;
                 if (str)

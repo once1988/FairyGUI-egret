@@ -751,7 +751,7 @@ module fairygui {
 					this._scrollPane.scrollToView(rect, ani, setFirst);
 			}
             else {
-                var obj: GButton = this.getChildAt(index).asButton;
+                var obj: GObject = this.getChildAt(index);
                 if(obj != null) {
                     if(this._scrollPane != null)
                         this._scrollPane.scrollToView(obj,ani,setFirst);
@@ -1312,7 +1312,8 @@ module fairygui {
 					{
 						url = this.itemProvider.call(this.callbackThisObj, curIndex % this._numItems);
 						if (url == null)
-							url = this.defaultItem;
+							url = this._defaultItem;
+						url = UIPackage.normalizeURL(url);
 					}
 					
 					if (ii.obj != null && ii.obj.resourceURL != url)
@@ -1473,7 +1474,8 @@ module fairygui {
 					{
 						url = this.itemProvider.call(this.callbackThisObj, curIndex % this._numItems);
 						if (url == null)
-							url = this.defaultItem;
+							url = this._defaultItem;
+						url = UIPackage.normalizeURL(url);
 					}
 					
 					if (ii.obj != null && ii.obj.resourceURL != url)
@@ -1614,6 +1616,7 @@ module fairygui {
 			var i:number;
 			var ii:ItemInfo, ii2:ItemInfo;
 			var col:number;
+			var url:string = this._defaultItem;
 			
 			GList.itemInfoVer++;
 			
@@ -1679,7 +1682,15 @@ module fairygui {
 					
 					if (ii.obj == null)
 					{
-						ii.obj = this._pool.getObject(this.defaultItem);
+						if (this.itemProvider != null)
+						{
+							url = this.itemProvider(i % this._numItems);
+							if (url == null)
+								url = this._defaultItem;
+							url = UIPackage.normalizeURL(url);
+						}
+
+						ii.obj = this._pool.getObject(url);
 						this.addChildAt(ii.obj, insertIndex);
 					}
 					else
@@ -1770,7 +1781,7 @@ module fairygui {
             var maxHeight: number = 0;
             var cw: number, ch: number = 0;
             var sw:number, sh:number;
-			var p:number;
+			var p:number = 0;
 			var cnt:number = this._children.length;
 			var viewWidth:number = this.viewWidth;
 			var viewHeight:number = this.viewHeight;
