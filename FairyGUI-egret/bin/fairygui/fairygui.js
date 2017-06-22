@@ -6,6 +6,7 @@ var fairygui;
             _super.call(this);
             this._selectedIndex = 0;
             this._previousIndex = 0;
+            this.changing = false;
             this._pageIds = [];
             this._pageNames = [];
             this._selectedIndex = -1;
@@ -33,10 +34,12 @@ var fairygui;
                 if (this._selectedIndex != value) {
                     if (value > this._pageIds.length - 1)
                         throw "index out of bounds: " + value;
+                    this.changing = true;
                     this._previousIndex = this._selectedIndex;
                     this._selectedIndex = value;
                     this._parent.applyController(this);
                     this.dispatchEvent(new fairygui.StateChangeEvent(fairygui.StateChangeEvent.CHANGED));
+                    this.changing = false;
                     if (this._playingTransition) {
                         this._playingTransition.stop();
                         this._playingTransition = null;
@@ -62,9 +65,11 @@ var fairygui;
             if (this._selectedIndex != value) {
                 if (value > this._pageIds.length - 1)
                     throw "index out of bounds: " + value;
+                this.changing = true;
                 this._previousIndex = this._selectedIndex;
                 this._selectedIndex = value;
                 this._parent.applyController(this);
+                this.changing = false;
                 if (this._playingTransition) {
                     this._playingTransition.stop();
                     this._playingTransition = null;
@@ -1679,11 +1684,13 @@ var fairygui;
                 str = xml.attributes.pages;
                 if (str)
                     pages = str.split(",");
-                str = xml.attributes.values;
-                if (str)
-                    values = str.split("|");
-                if (pages && values) {
-                    for (var i = 0; i < values.length; i++)
+                if (pages) {
+                    str = xml.attributes.values;
+                    if (str)
+                        values = str.split("|");
+                    else
+                        values = [];
+                    for (var i = 0; i < pages.length; i++)
                         this.addStatus(pages[i], values[i]);
                 }
                 str = xml.attributes.default;
@@ -5094,7 +5101,13 @@ var fairygui;
         };
         p.setup_afterAdd = function (xml) {
             _super.prototype.setup_afterAdd.call(this, xml);
-            var str = xml.attributes.controller;
+            var str;
+            if (this.scrollPane) {
+                str = xml.attributes.pageController;
+                if (str)
+                    this.scrollPane.pageController = this.parent.getController(str);
+            }
+            str = xml.attributes.controller;
             if (str) {
                 var arr = str.split(",");
                 for (var i = 0; i < arr.length; i += 2) {
@@ -5696,6 +5709,7 @@ var fairygui;
                     if (this._icons != null)
                         this.icon = null;
                 }
+                this.updateSelectionController();
             }
         );
         d(p, "value"
@@ -5704,6 +5718,14 @@ var fairygui;
             }
             ,function (val) {
                 this.selectedIndex = this._values.indexOf(val);
+            }
+        );
+        d(p, "selectionController"
+            ,function () {
+                return this._selectionController;
+            }
+            ,function (value) {
+                this._selectionController = value;
             }
         );
         p.setState = function (val) {
@@ -5743,6 +5765,20 @@ var fairygui;
                 this.displayObject.addEventListener(egret.TouchEvent.TOUCH_ROLL_OUT, this.__rollout, this);
             }*/
             this.addEventListener(egret.TouchEvent.TOUCH_BEGIN, this.__mousedown, this);
+        };
+        p.handleControllerChanged = function (c) {
+            _super.prototype.handleControllerChanged.call(this, c);
+            if (this._selectionController == c)
+                this.selectedIndex = c.selectedIndex;
+        };
+        p.updateSelectionController = function () {
+            if (this._selectionController != null && !this._selectionController.changing
+                && this._selectedIndex < this._selectionController.pageCount) {
+                var c = this._selectionController;
+                this._selectionController = null;
+                c.selectedIndex = this._selectedIndex;
+                this._selectionController = c;
+            }
         };
         p.dispose = function () {
             if (this.dropdown) {
@@ -5800,6 +5836,9 @@ var fairygui;
                     else if (str == "auto")
                         this._popupDownward = null;
                 }
+                str = xml.attributes.selectionController;
+                if (str)
+                    this._selectionController = this.parent.getController(str);
             }
         };
         p.showDropdown = function () {
@@ -6895,6 +6934,14 @@ var fairygui;
                 this._selectionMode = value;
             }
         );
+        d(p, "selectionController"
+            ,function () {
+                return this._selectionController;
+            }
+            ,function (value) {
+                this._selectionController = value;
+            }
+        );
         d(p, "itemPool"
             ,function () {
                 return this._pool;
@@ -7002,8 +7049,10 @@ var fairygui;
             if (index < 0 || index >= this._children.length)
                 return;
             var obj = this.getChildAt(index).asButton;
-            if (obj != null && !obj.selected)
+            if (obj != null && !obj.selected) {
                 obj.selected = true;
+                this.updateSelectionController(index);
+            }
         };
         p.removeSelection = function (index) {
             if (index === void 0) { index = 0; }
@@ -7027,11 +7076,16 @@ var fairygui;
         p.selectAll = function () {
             this.checkVirtualList();
             var cnt = this._children.length;
+            var last = -1;
             for (var i = 0; i < cnt; i++) {
                 var obj = this._children[i].asButton;
-                if (obj != null)
+                if (obj != null) {
                     obj.selected = true;
+                    last = i;
+                }
             }
+            if (last != -1)
+                this.updateSelectionController(last);
         };
         p.selectNone = function () {
             var cnt = this._children.length;
@@ -7044,11 +7098,17 @@ var fairygui;
         p.selectReverse = function () {
             this.checkVirtualList();
             var cnt = this._children.length;
+            var last = -1;
             for (var i = 0; i < cnt; i++) {
                 var obj = this._children[i].asButton;
-                if (obj != null)
+                if (obj != null) {
                     obj.selected = !obj.selected;
+                    if (obj.selected)
+                        last = i;
+                }
             }
+            if (last != -1)
+                this.updateSelectionController(last);
         };
         p.handleArrowKey = function (dir) {
             if (dir === void 0) { dir = 0; }
@@ -7233,7 +7293,8 @@ var fairygui;
             }
             if (!dontChangeLastIndex)
                 this._lastSelectedIndex = index;
-            return;
+            if (button.selected)
+                this.updateSelectionController(index);
         };
         p.clearSelectionExcept = function (obj) {
             var cnt = this._children.length;
@@ -7309,10 +7370,22 @@ var fairygui;
             _super.prototype.handleSizeChanged.call(this);
             if (this._autoResizeItem)
                 this.adjustItemsSize();
-            if (this._layout == fairygui.ListLayoutType.FlowHorizontal || this._layout == fairygui.ListLayoutType.FlowVertical) {
-                this.setBoundsChangedFlag();
-                if (this._virtual)
-                    this.setVirtualListChangedFlag(true);
+            this.setBoundsChangedFlag();
+            if (this._virtual)
+                this.setVirtualListChangedFlag(true);
+        };
+        p.handleControllerChanged = function (c) {
+            _super.prototype.handleControllerChanged.call(this, c);
+            if (this._selectionController == c)
+                this.selectedIndex = c.selectedIndex;
+        };
+        p.updateSelectionController = function (index) {
+            if (this._selectionController != null && !this._selectionController.changing
+                && index < this._selectionController.pageCount) {
+                var c = this._selectionController;
+                this._selectionController = null;
+                c.selectedIndex = index;
+                this._selectionController = c;
             }
         };
         p.adjustItemsSize = function () {
@@ -8096,6 +8169,8 @@ var fairygui;
             var lastObj = null;
             var insertIndex = 0;
             for (i = startIndex; i < lastIndex; i++) {
+                if (i >= this._realNumItems)
+                    continue;
                 ii = this._virtualItems[i];
                 if (ii.updateFlag != GList.itemInfoVer)
                     continue;
@@ -8147,6 +8222,8 @@ var fairygui;
             var yy = 0;
             var lineHeight = 0;
             for (i = startIndex; i < lastIndex; i++) {
+                if (i >= this._realNumItems)
+                    continue;
                 ii = this._virtualItems[i];
                 if (ii.updateFlag == GList.itemInfoVer)
                     ii.obj.setXY(xx, yy);
@@ -8460,6 +8537,13 @@ var fairygui;
                     }
                 }
             }
+        };
+        p.setup_afterAdd = function (xml) {
+            _super.prototype.setup_afterAdd.call(this, xml);
+            var str;
+            str = xml.attributes.selectionController;
+            if (str)
+                this._selectionController = this.parent.getController(str);
         };
         GList.itemInfoVer = 0; //用来标志item是否在本次处理中已经被重用了
         GList.enterCounter = 0; //因为HandleScroll是会重入的，这个用来避免极端情况下的死锁
@@ -9520,14 +9604,14 @@ var fairygui;
             var textLength = this._text.length;
             for (var offset = 0; offset < textLength; ++offset) {
                 var ch = this._text.charAt(offset);
-                var cc = ch.charCodeAt(offset);
-                if (ch == "\n") {
+                var cc = ch.charCodeAt(0);
+                if (cc == 10) {
                     lineBuffer += ch;
                     line = LineInfo.borrow();
                     line.width = lineWidth;
                     if (lineTextHeight == 0) {
                         if (lastLineHeight == 0)
-                            lastLineHeight = Math.ceil(this._fontSize * fontScale);
+                            lastLineHeight = this._fontSize;
                         if (lineHeight == 0)
                             lineHeight = lastLineHeight;
                         lineTextHeight = lineHeight;
@@ -9550,29 +9634,25 @@ var fairygui;
                     wordEnd = 0;
                     continue;
                 }
-                if (cc > 256 || cc <= 32) {
-                    if (wordChars > 0)
-                        wordEnd = lineWidth;
-                    wordChars = 0;
-                }
-                else {
+                if (cc >= 65 && cc <= 90 || cc >= 97 && cc <= 122) {
                     if (wordChars == 0)
                         wordStart = lineWidth;
                     wordChars++;
                 }
-                if (ch == " ") {
+                else {
+                    if (wordChars > 0)
+                        wordEnd = lineWidth;
+                    wordChars = 0;
+                }
+                if (cc == 32) {
                     glyphWidth = Math.ceil(this._fontSize / 2);
-                    glyphHeight = Math.ceil(this._fontSize);
+                    glyphHeight = this._fontSize;
                 }
                 else {
                     var glyph = this._bitmapFont.glyphs[ch];
                     if (glyph) {
                         glyphWidth = Math.ceil(glyph.advance * fontScale);
                         glyphHeight = Math.ceil(glyph.lineHeight * fontScale);
-                    }
-                    else if (ch == " ") {
-                        glyphWidth = Math.ceil(this._bitmapFont.size * fontScale / 2);
-                        glyphHeight = Math.ceil(this._bitmapFont.size * fontScale);
                     }
                     else {
                         glyphWidth = 0;
@@ -9601,7 +9681,7 @@ var fairygui;
                         var len = lineBuffer.length - wordChars;
                         line.text = fairygui.ToolSet.trimRight(lineBuffer.substr(0, len));
                         line.width = wordEnd;
-                        lineBuffer = lineBuffer.substr(len + 1);
+                        lineBuffer = lineBuffer.substr(len);
                         lineWidth -= wordStart;
                     }
                     else {
@@ -9622,8 +9702,7 @@ var fairygui;
                     this._lines.push(line);
                 }
             }
-            if (lineBuffer.length > 0
-                || this._lines.length > 0 && fairygui.ToolSet.endsWith(this._lines[this._lines.length - 1].text, "\n")) {
+            if (lineBuffer.length > 0) {
                 line = LineInfo.borrow();
                 line.width = lineWidth;
                 if (lineHeight == 0)
@@ -9690,6 +9769,13 @@ var fairygui;
                 textLength = line.text.length;
                 for (var j = 0; j < textLength; j++) {
                     ch = line.text.charAt(j);
+                    cc = ch.charCodeAt(0);
+                    if (cc == 10)
+                        continue;
+                    if (cc == 32) {
+                        charX += letterSpacing + Math.ceil(this._fontSize / 2);
+                        continue;
+                    }
                     glyph = this._bitmapFont.glyphs[ch];
                     if (glyph != null) {
                         charIndent = (line.height + line.textHeight) / 2 - Math.ceil(glyph.lineHeight * fontScale);
@@ -9707,9 +9793,6 @@ var fairygui;
                         bm.scaleY = fontScale;
                         this._bitmapContainer.addChild(bm);
                         charX += letterSpacing + Math.ceil(glyph.advance * fontScale);
-                    }
-                    else if (ch == " ") {
-                        charX += letterSpacing + Math.ceil(this._bitmapFont.size * fontScale / 2);
                     }
                     else {
                         charX += letterSpacing;
@@ -11975,7 +12058,12 @@ var fairygui;
         );
         d(p, "currentPageX"
             ,function () {
-                return this._pageMode ? Math.floor(this.posX / this._pageSizeH) : 0;
+                if (!this._pageMode)
+                    return 0;
+                var page = Math.floor(this._xPos / this._pageSizeH);
+                if (this._xPos - page * this._pageSizeH > this._pageSizeH * 0.5)
+                    page++;
+                return page;
             }
             ,function (value) {
                 if (this._pageMode && this._xOverlap > 0)
@@ -11984,11 +12072,24 @@ var fairygui;
         );
         d(p, "currentPageY"
             ,function () {
-                return this._pageMode ? Math.floor(this.posY / this._pageSizeV) : 0;
+                if (!this._pageMode)
+                    return 0;
+                var page = Math.floor(this._yPos / this._pageSizeV);
+                if (this._yPos - page * this._pageSizeV > this._pageSizeV * 0.5)
+                    page++;
+                return page;
             }
             ,function (value) {
                 if (this._pageMode && this._yOverlap > 0)
                     this.setPosY(value * this._pageSizeV, false);
+            }
+        );
+        d(p, "pageController"
+            ,function () {
+                return this._pageController;
+            }
+            ,function (value) {
+                this._pageController = value;
             }
         );
         d(p, "scrollingPosX"
@@ -12152,6 +12253,29 @@ var fairygui;
         p.onOwnerSizeChanged = function () {
             this.setSize(this._owner.width, this._owner.height);
             this.posChanged(false);
+        };
+        p.handleControllerChanged = function (c) {
+            if (this._pageController == c) {
+                if (this._scrollType == fairygui.ScrollType.Horizontal)
+                    this.currentPageX = c.selectedIndex;
+                else
+                    this.currentPageY = c.selectedIndex;
+            }
+        };
+        p.updatePageController = function () {
+            if (this._pageController != null && !this._pageController.changing) {
+                var index;
+                if (this._scrollType == fairygui.ScrollType.Horizontal)
+                    index = this.currentPageX;
+                else
+                    index = this.currentPageY;
+                if (index < this._pageController.pageCount) {
+                    var c = this._pageController;
+                    this._pageController = null; //防止HandleControllerChanged的调用
+                    c.selectedIndex = index;
+                    this._pageController = c;
+                }
+            }
         };
         p.adjustMaskContainer = function () {
             var mx, my;
@@ -12343,6 +12467,8 @@ var fairygui;
                 this._vtScrollBar.scrollPerc = this._yPerc;
             if (this._hzScrollBar != null)
                 this._hzScrollBar.scrollPerc = this._xPerc;
+            if (this._pageMode)
+                this.updatePageController();
         };
         p.validateHolderPos = function () {
             this._container.x = fairygui.ToolSet.clamp(this._container.x, -this._xOverlap, 0);
@@ -12485,6 +12611,8 @@ var fairygui;
                 if (this._hzScrollBar)
                     this._hzScrollBar.scrollPerc = this._xPerc;
             }
+            if (this._pageMode)
+                this.updatePageController();
         };
         p.syncPos = function () {
             if (this._xOverlap > 0) {
@@ -12495,6 +12623,8 @@ var fairygui;
                 this._yPos = fairygui.ToolSet.clamp(-this._container.y, 0, this._yOverlap);
                 this._yPerc = this._yPos / this._yOverlap;
             }
+            if (this._pageMode)
+                this.updatePageController();
         };
         p.syncScrollBar = function (end) {
             if (end === void 0) { end = false; }
@@ -12660,6 +12790,8 @@ var fairygui;
             ScrollPane._gestureFlag = 0;
             if (!this.isDragged || !this._touchEffect || this._inertiaDisabled || this._owner.displayObject.stage == null)
                 return;
+            // touch事件不一定都是以tap结束,拖拽的结束动作是touchEnd,这时需要正确处理isDragged标记位.否则在播放滚动动画时会因为处于拖拽状态而使滚动动画失效
+            this.isDragged = false;
             var time = (egret.getTimer() - this._time2) / 1000;
             if (time == 0)
                 time = 0.001;
